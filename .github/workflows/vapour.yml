@@ -1,0 +1,35 @@
+# Vapour tutorial workflow (from vapour-computer/vapour-ci templates/godot-publish.yml).
+# - Every push/PR to this branch: export the Web build and check it (no secrets needed).
+# - Pushing a tag like v0.1.0: also publish to Vapour (needs the VAPOUR_TOKEN secret).
+name: vapour
+on:
+  push:
+    branches: [vapour-tutorial]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+env:
+  GODOT_VERSION: "4.7.2"
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.2   # keep in sync with GODOT_VERSION
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install export templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/ 2>/dev/null || true
+      - name: Export for web
+        run: |
+          mkdir -p build/web
+          godot --headless --export-release "Web" build/web/index.html
+      - name: Check the export
+        run: test -f build/web/index.html && test -f build/web/index.wasm && ls -la build/web
+      - name: Publish (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: vapour-computer/vapour-ci@v1
+        with:
+          token: ${{ secrets.VAPOUR_TOKEN }}
+          version: ${{ github.ref_name }}

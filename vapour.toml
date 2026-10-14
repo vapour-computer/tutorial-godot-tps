@@ -1,0 +1,71 @@
+[project]
+title = "TPS Demo"
+slug = "tutorial-godot-tps"
+engine = "godot"
+platform = "desktop"
+version = "0.1.0"
+
+[build]
+dir = "build/web"
+
+# Touch controls for phones. Each control sends the keyboard keys that
+# project.godot already binds (see the [input] section there).
+[controller]
+mode = "keyboard-map"
+
+[[controller.controls]]
+id = "move"
+type = "joystick"
+x = 0.20
+y = 0.74
+w = 0.30
+h = 0.30
+up = "w"
+down = "s"
+left = "a"
+right = "d"
+deadzone = 0.18
+sensitivity = 1.0
+repeat_hz = 60
+
+[[controller.controls]]
+id = "look"
+type = "joystick"
+x = 0.80
+y = 0.74
+w = 0.30
+h = 0.30
+up = "i"
+down = "k"
+left = "j"
+right = "l"
+deadzone = 0.12
+sensitivity = 1.25
+repeat_hz = 90
+
+[[controller.controls]]
+id = "jump"
+type = "button"
+x = 0.58
+y = 0.48
+w = 0.13
+h = 0.13
+key = "Space"
+
+[[controller.controls]]
+id = "shoot"
+type = "button"
+x = 0.88
+y = 0.46
+w = 0.13
+h = 0.13
+key = "f"
+
+[[controller.controls]]
+id = "aim"
+type = "button"
+x = 0.74
+y = 0.30
+w = 0.11
+h = 0.11
+key = "q"
