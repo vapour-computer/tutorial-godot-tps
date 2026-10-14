@@ -8,7 +8,7 @@ This branch of the Godot [TPS demo](https://github.com/godotengine/tps-demo) is 
 | `export_presets.cfg` | A **Web** export preset: Compatibility-friendly, threads off |
 | `project.godot` | Keyboard bindings added for `shoot` (F), `aim` (Q) and `view_*` (I J K L), so touch controls can drive them |
 | `vapour.toml` | Game manifest and the phone `[controller]` layout (two sticks, three buttons) |
-| `.github/workflows/vapour.yml` | Exports the Web build on every push; publishes to Vapour on `v*` tags |
+| `.github/workflows/vapour-check.yml`, `vapour-publish.yml` | Exports the Web build on every push; publishes to Vapour on `v*` tags (needs a released vapour-ci) |
 
 Upstream's license (MIT) and credits are unchanged; see `LICENSE.md`.
 
