@@ -5,8 +5,11 @@ signal quit
 
 const RedRobot: PackedScene = preload("res://enemies/red_robot/red_robot.tscn")
 const PlayerScene: PackedScene = preload("res://player/player.tscn")
+const SettingsPanelScene: PackedScene = preload("res://menu/settings_panel.tscn")
 
 var lightmap_gi: LightmapGI = null
+var level_settings_panel: SettingsPanel = null
+var last_pointer_was_real_mouse: bool = false
 
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var robot_spawn_points: Node3D = $RobotSpawnpoints
@@ -16,6 +19,7 @@ var lightmap_gi: LightmapGI = null
 
 func _ready() -> void:
 	Settings.apply_graphics_settings(get_window(), world_environment.environment, self)
+	_setup_level_settings_menu()
 
 	if Settings.config_file.get_value("rendering", "gi_type") == Settings.GIType.SDFGI:
 		setup_sdfgi()
@@ -40,6 +44,48 @@ func _ready() -> void:
 		# Then spawn/despawn players as they connect/disconnect
 		multiplayer.peer_connected.connect(add_player)
 		multiplayer.peer_disconnected.connect(del_player)
+
+
+func _setup_level_settings_menu() -> void:
+	level_settings_panel = SettingsPanelScene.instantiate()
+	level_settings_panel.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	level_settings_panel.configure(world_environment.environment, self)
+	level_settings_panel.set_quit_action_enabled(true, "BACK TO MENU")
+	level_settings_panel.closed.connect(_close_level_settings)
+	level_settings_panel.quit_requested.connect(_quit_to_main_menu)
+	level_settings_panel.pointer_source_changed.connect(_on_settings_pointer_source_changed)
+	var layer := CanvasLayer.new()
+	layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	layer.layer = 100
+	layer.add_child(level_settings_panel)
+	add_child(layer)
+
+
+func _open_level_settings() -> void:
+	if level_settings_panel == null:
+		return
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	get_tree().paused = true
+	level_settings_panel.open_panel()
+
+
+func _close_level_settings() -> void:
+	if level_settings_panel == null:
+		return
+	if level_settings_panel.visible:
+		level_settings_panel.hide()
+	get_tree().paused = false
+	if last_pointer_was_real_mouse:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+
+func _quit_to_main_menu() -> void:
+	_close_level_settings()
+	quit.emit()
+
+
+func _on_settings_pointer_source_changed(real_mouse: bool) -> void:
+	last_pointer_was_real_mouse = real_mouse
 
 
 func setup_sdfgi() -> void:
@@ -122,6 +168,11 @@ func add_player(id: int, spawn_point: Marker3D = null) -> void:
 
 
 func _input(input_event: InputEvent) -> void:
+	if input_event is InputEventMouseButton and input_event.is_pressed():
+		var mouse_event := input_event as InputEventMouseButton
+		last_pointer_was_real_mouse = mouse_event.device != InputEvent.DEVICE_ID_EMULATION
+
 	if input_event.is_action_pressed(&"quit"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		quit.emit()
+		get_viewport().set_input_as_handled()
+		if not get_tree().paused:
+			_open_level_settings()

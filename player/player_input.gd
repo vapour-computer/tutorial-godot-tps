@@ -18,6 +18,10 @@ var toggled_aim: bool = false
 # The duration the aiming button was held for (in seconds).
 var aiming_timer: float = 0.0
 
+var ignore_next_web_mouse_motion: bool = false
+var shoot_from_touch_or_controller: bool = false
+var skip_shoot_frame: int = -1
+
 # Synchronized controls
 @export var aiming: bool = false
 @export var shoot_target := Vector3()
@@ -38,7 +42,6 @@ var aiming_timer: float = 0.0
 func _ready() -> void:
 	if get_multiplayer_authority() == multiplayer.get_unique_id():
 		camera_camera.make_current()
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	else:
 		set_process(false)
 		set_process_input(false)
@@ -82,7 +85,14 @@ func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("jump"):
 		jump.rpc()
 
-	shooting = Input.is_action_pressed("shoot")
+	var shoot_pressed: bool = Input.is_action_pressed("shoot")
+	if not shoot_pressed:
+		shoot_from_touch_or_controller = false
+
+	shooting = shoot_pressed and (Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED or shoot_from_touch_or_controller)
+	if Engine.get_process_frames() == skip_shoot_frame:
+		shooting = false
+
 	if shooting:
 		var ch_pos = crosshair.position + crosshair.size * 0.5
 		var ray_from = camera_camera.project_ray_origin(ch_pos)
@@ -106,11 +116,45 @@ func _process(delta: float) -> void:
 
 
 func _input(input_event: InputEvent) -> void:
+	if input_event.is_action_pressed(&"shoot"):
+		shoot_from_touch_or_controller = _is_touch_or_controller_input(input_event)
+	elif input_event.is_action_released(&"shoot"):
+		shoot_from_touch_or_controller = false
+
+	if _is_real_mouse_button_press(input_event) and Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		if OS.has_feature("web"):
+			ignore_next_web_mouse_motion = true
+		skip_shoot_frame = Engine.get_process_frames()
+		get_viewport().set_input_as_handled()
+		return
+
 	if input_event is InputEventMouseMotion:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+			return
+		if OS.has_feature("web") and ignore_next_web_mouse_motion:
+			ignore_next_web_mouse_motion = false
+			return
+
 		var camera_speed_this_frame = CAMERA_MOUSE_ROTATION_SPEED
 		if aiming:
 			camera_speed_this_frame *= 0.75
 		rotate_camera(input_event.screen_relative * camera_speed_this_frame)
+
+
+func _is_real_mouse_button_press(input_event: InputEvent) -> bool:
+	if not (input_event is InputEventMouseButton):
+		return false
+	var mouse_event := input_event as InputEventMouseButton
+	if not mouse_event.is_pressed():
+		return false
+	return mouse_event.device != InputEvent.DEVICE_ID_EMULATION
+
+
+func _is_touch_or_controller_input(input_event: InputEvent) -> bool:
+	if input_event.device == InputEvent.DEVICE_ID_EMULATION:
+		return true
+	return input_event is InputEventScreenTouch or input_event is InputEventScreenDrag or input_event is InputEventJoypadButton or input_event is InputEventJoypadMotion
 
 
 func rotate_camera(move: Vector2) -> void:
