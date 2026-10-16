@@ -8,6 +8,9 @@ version = "0.1.0"
 [build]
 dir = "build/web"
 
+[runtime]
+on_quit = "store"
+
 # Touch controls for phones. Each control sends the keyboard keys that
 # project.godot already binds (see the [input] section there).
 [controller]
@@ -69,3 +72,12 @@ y = 0.30
 w = 0.11
 h = 0.11
 key = "q"
+
+[[controller.controls]]
+id = "menu"
+type = "button"
+x = 0.93
+y = 0.08
+w = 0.10
+h = 0.10
+key = "Escape"

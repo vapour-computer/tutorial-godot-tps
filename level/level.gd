@@ -5,8 +5,10 @@ signal quit
 
 const RedRobot: PackedScene = preload("res://enemies/red_robot/red_robot.tscn")
 const PlayerScene: PackedScene = preload("res://player/player.tscn")
+const MenuScene: PackedScene = preload("res://menu/menu.tscn")
 
 var lightmap_gi: LightmapGI = null
+var level_settings_menu: Node = null
 
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var robot_spawn_points: Node3D = $RobotSpawnpoints
@@ -16,6 +18,7 @@ var lightmap_gi: LightmapGI = null
 
 func _ready() -> void:
 	Settings.apply_graphics_settings(get_window(), world_environment.environment, self)
+	_setup_level_settings_menu()
 
 	if Settings.config_file.get_value("rendering", "gi_type") == Settings.GIType.SDFGI:
 		setup_sdfgi()
@@ -40,6 +43,60 @@ func _ready() -> void:
 		# Then spawn/despawn players as they connect/disconnect
 		multiplayer.peer_connected.connect(add_player)
 		multiplayer.peer_disconnected.connect(del_player)
+
+
+func _setup_level_settings_menu() -> void:
+	level_settings_menu = MenuScene.instantiate()
+	level_settings_menu.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	level_settings_menu.hide()
+	add_child(level_settings_menu)
+
+	for node_name in ["WorldEnvironment", "PlayerModel", "SoundEffects", "Floor", "SpotLight3D", "SpotLightBounce", "Camera3D", "Music", "AnimationTree", "TextureRect"]:
+		if level_settings_menu.has_node(node_name):
+			level_settings_menu.get_node(node_name).hide()
+
+	var ui: Control = level_settings_menu.get_node(^"UI")
+	ui.get_node(^"Main").hide()
+	ui.get_node(^"Online").hide()
+	ui.get_node(^"Loading").hide()
+	ui.get_node(^"Settings").hide()
+
+	var apply_button: Button = level_settings_menu.get_node(^"UI/Settings/Actions/Apply")
+	var cancel_button: Button = level_settings_menu.get_node(^"UI/Settings/Actions/Cancel")
+	var settings_actions: HBoxContainer = level_settings_menu.get_node(^"UI/Settings/Actions")
+	var back_to_menu_button := Button.new()
+	back_to_menu_button.text = "BACK TO MENU"
+	settings_actions.add_child(back_to_menu_button)
+	apply_button.pressed.connect(_close_level_settings)
+	cancel_button.pressed.connect(_close_level_settings)
+	back_to_menu_button.pressed.connect(_quit_to_main_menu)
+
+
+func _open_level_settings() -> void:
+	if level_settings_menu == null:
+		return
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	get_tree().paused = true
+	level_settings_menu.show()
+	level_settings_menu.call("_on_settings_pressed")
+
+
+func _close_level_settings() -> void:
+	if level_settings_menu == null:
+		return
+	level_settings_menu.hide()
+	var ui: Control = level_settings_menu.get_node(^"UI")
+	ui.get_node(^"Main").hide()
+	ui.get_node(^"Online").hide()
+	ui.get_node(^"Loading").hide()
+	get_tree().paused = false
+	if not DisplayServer.is_touchscreen_available() or OS.has_feature("pc"):
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+
+func _quit_to_main_menu() -> void:
+	_close_level_settings()
+	quit.emit()
 
 
 func setup_sdfgi() -> void:
@@ -123,5 +180,8 @@ func add_player(id: int, spawn_point: Marker3D = null) -> void:
 
 func _input(input_event: InputEvent) -> void:
 	if input_event.is_action_pressed(&"quit"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		quit.emit()
+		get_viewport().set_input_as_handled()
+		if get_tree().paused:
+			_close_level_settings()
+		else:
+			_open_level_settings()

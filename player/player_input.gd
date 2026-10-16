@@ -12,11 +12,16 @@ const CAMERA_X_ROT_MAX: float = deg_to_rad(70.0)
 # If the aiming button was held for less than 0.4 seconds, keep aiming until the aiming button is pressed again.
 const AIM_HOLD_THRESHOLD: float = 0.4
 
+const TOUCH_CAPTURE_CHECK: bool = not DisplayServer.is_touchscreen_available() or OS.has_feature("pc")
+
 # If `true`, the aim button was toggled checked by a short press (instead of being held down).
 var toggled_aim: bool = false
 
 # The duration the aiming button was held for (in seconds).
 var aiming_timer: float = 0.0
+
+var can_capture_mouse: bool = false
+var ignore_next_web_mouse_motion: bool = false
 
 # Synchronized controls
 @export var aiming: bool = false
@@ -38,7 +43,7 @@ var aiming_timer: float = 0.0
 func _ready() -> void:
 	if get_multiplayer_authority() == multiplayer.get_unique_id():
 		camera_camera.make_current()
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		can_capture_mouse = TOUCH_CAPTURE_CHECK
 	else:
 		set_process(false)
 		set_process_input(false)
@@ -106,7 +111,20 @@ func _process(delta: float) -> void:
 
 
 func _input(input_event: InputEvent) -> void:
+	if can_capture_mouse and input_event is InputEventMouseButton and input_event.is_pressed() and Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		if OS.has_feature("web"):
+			ignore_next_web_mouse_motion = true
+		get_viewport().set_input_as_handled()
+		return
+
 	if input_event is InputEventMouseMotion:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+			return
+		if OS.has_feature("web") and ignore_next_web_mouse_motion:
+			ignore_next_web_mouse_motion = false
+			return
+
 		var camera_speed_this_frame = CAMERA_MOUSE_ROTATION_SPEED
 		if aiming:
 			camera_speed_this_frame *= 0.75
