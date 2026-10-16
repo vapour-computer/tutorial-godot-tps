@@ -5,10 +5,11 @@ signal quit
 
 const RedRobot: PackedScene = preload("res://enemies/red_robot/red_robot.tscn")
 const PlayerScene: PackedScene = preload("res://player/player.tscn")
-const MenuScene: PackedScene = preload("res://menu/menu.tscn")
+const SettingsPanelScene: PackedScene = preload("res://menu/settings_panel.tscn")
 
 var lightmap_gi: LightmapGI = null
-var level_settings_menu: Node = null
+var level_settings_panel: SettingsPanel = null
+var last_pointer_was_real_mouse: bool = false
 
 @onready var world_environment: WorldEnvironment = $WorldEnvironment
 @onready var robot_spawn_points: Node3D = $RobotSpawnpoints
@@ -46,57 +47,45 @@ func _ready() -> void:
 
 
 func _setup_level_settings_menu() -> void:
-	level_settings_menu = MenuScene.instantiate()
-	level_settings_menu.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
-	level_settings_menu.hide()
-	add_child(level_settings_menu)
-
-	for node_name in ["WorldEnvironment", "PlayerModel", "SoundEffects", "Floor", "SpotLight3D", "SpotLightBounce", "Camera3D", "Music", "AnimationTree", "TextureRect"]:
-		if level_settings_menu.has_node(node_name):
-			level_settings_menu.get_node(node_name).hide()
-
-	var ui: Control = level_settings_menu.get_node(^"UI")
-	ui.get_node(^"Main").hide()
-	ui.get_node(^"Online").hide()
-	ui.get_node(^"Loading").hide()
-	ui.get_node(^"Settings").hide()
-
-	var apply_button: Button = level_settings_menu.get_node(^"UI/Settings/Actions/Apply")
-	var cancel_button: Button = level_settings_menu.get_node(^"UI/Settings/Actions/Cancel")
-	var settings_actions: HBoxContainer = level_settings_menu.get_node(^"UI/Settings/Actions")
-	var back_to_menu_button := Button.new()
-	back_to_menu_button.text = "BACK TO MENU"
-	settings_actions.add_child(back_to_menu_button)
-	apply_button.pressed.connect(_close_level_settings)
-	cancel_button.pressed.connect(_close_level_settings)
-	back_to_menu_button.pressed.connect(_quit_to_main_menu)
+	level_settings_panel = SettingsPanelScene.instantiate()
+	level_settings_panel.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	level_settings_panel.configure(world_environment.environment, self)
+	level_settings_panel.set_quit_action_enabled(true, "BACK TO MENU")
+	level_settings_panel.closed.connect(_close_level_settings)
+	level_settings_panel.quit_requested.connect(_quit_to_main_menu)
+	level_settings_panel.pointer_source_changed.connect(_on_settings_pointer_source_changed)
+	var layer := CanvasLayer.new()
+	layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	layer.layer = 100
+	layer.add_child(level_settings_panel)
+	add_child(layer)
 
 
 func _open_level_settings() -> void:
-	if level_settings_menu == null:
+	if level_settings_panel == null:
 		return
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	get_tree().paused = true
-	level_settings_menu.show()
-	level_settings_menu.call("_on_settings_pressed")
+	level_settings_panel.open_panel()
 
 
 func _close_level_settings() -> void:
-	if level_settings_menu == null:
+	if level_settings_panel == null:
 		return
-	level_settings_menu.hide()
-	var ui: Control = level_settings_menu.get_node(^"UI")
-	ui.get_node(^"Main").hide()
-	ui.get_node(^"Online").hide()
-	ui.get_node(^"Loading").hide()
+	if level_settings_panel.visible:
+		level_settings_panel.hide()
 	get_tree().paused = false
-	if not DisplayServer.is_touchscreen_available() or OS.has_feature("pc"):
+	if last_pointer_was_real_mouse:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 
 func _quit_to_main_menu() -> void:
 	_close_level_settings()
 	quit.emit()
+
+
+func _on_settings_pointer_source_changed(real_mouse: bool) -> void:
+	last_pointer_was_real_mouse = real_mouse
 
 
 func setup_sdfgi() -> void:
@@ -179,9 +168,11 @@ func add_player(id: int, spawn_point: Marker3D = null) -> void:
 
 
 func _input(input_event: InputEvent) -> void:
+	if input_event is InputEventMouseButton and input_event.is_pressed():
+		var mouse_event := input_event as InputEventMouseButton
+		last_pointer_was_real_mouse = mouse_event.device != InputEvent.DEVICE_ID_EMULATION
+
 	if input_event.is_action_pressed(&"quit"):
 		get_viewport().set_input_as_handled()
-		if get_tree().paused:
-			_close_level_settings()
-		else:
+		if not get_tree().paused:
 			_open_level_settings()
